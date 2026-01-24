@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME AD to BS Converter
 // @namespace    https://greasyfork.org/users/1087400
-// @version      0.1.4
+// @version      0.1.5
 // @description  Converts AD dates to BS dates in WME closure panel
 // @author       https://greasyfork.org/en/users/1087400-kid4rm90s
 // @include 	   /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
@@ -25,8 +25,9 @@
 (function main() {
     'use strict';
 
-  const updateMessage = `<strong>Version 0.1.4 - 2026-01-24:</strong><br>
-    - Currently supports for native UI for closure segment<br> - Will add support for more date inputs in future updates<br>`;
+  const updateMessage = `<strong>Version 0.1.5 - 2026-01-24:</strong><br>
+    - Currently supports for native UI for closure segment<br>
+    - Fixed issue where calender was showing wrong dates for BS <br>- Will add support for more date inputs in future updates<br>`;
     const scriptName = GM_info.script.name;
     const scriptVersion = GM_info.script.version;
     const downloadUrl = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/code/WME-AD-to-BS-Converter.user.js';
@@ -234,14 +235,18 @@
             grid.style = 'border-collapse: collapse; width: 100%;';
             popup.appendChild(grid);
 
-            // Helper: get days in BS month
+            // Helper: get days in BS month (robust)
             function getDaysInBSMonth(year, month) {
-                // NepaliDate library may not expose this, so use a fallback (30 days)
-                // Try to get last day by incrementing day until invalid
                 let d = 1;
                 while (d <= 35) {
-                    const ad = unsafeWindow.NepaliDate.BS_TO_AD(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+                    const bsStr = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    const ad = unsafeWindow.NepaliDate.BS_TO_AD(bsStr);
                     if (!ad || ad.includes('Error') || ad.includes('Invalid')) break;
+                    // Convert back to BS to verify month
+                    const bsBack = unsafeWindow.NepaliDate.AD_TO_BS(ad);
+                    if (!bsBack || bsBack.includes('Error') || bsBack.includes('Invalid')) break;
+                    const [bsy, bsm, bsd] = bsBack.split('-').map(Number);
+                    if (bsy !== year || bsm !== month) break;
                     d++;
                 }
                 return d-1;
@@ -458,7 +463,11 @@
 })();
 
 /******** Version changelog  ********
+Version 0.1.5 - 2026-01-24
+    - Fixed issue where calender was showing wrong dates for BS
+    - Will add support for more date inputs in future updates
 Version 0.1.4 - 2026-01-24
-    - Currently supports for native UI for closure segment<br> - Will add support for more date inputs in future updates
+    - Currently supports for native UI for closure segment
+    - Will add support for more date inputs in future updates
     
 *********************/
