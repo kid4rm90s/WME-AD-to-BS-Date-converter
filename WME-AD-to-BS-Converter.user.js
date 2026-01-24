@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME AD to BS Converter
 // @namespace    https://greasyfork.org/users/1087400
-// @version      0.1.3
+// @version      0.1.4
 // @description  Converts AD dates to BS dates in WME closure panel
 // @author       https://greasyfork.org/en/users/1087400-kid4rm90s
 // @include 	   /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
@@ -25,8 +25,12 @@
 (function main() {
     'use strict';
 
+  const updateMessage = `<strong>Version 0.1.4 - 2026-01-24:</strong><br>
+    - Currently supports for native UI for closure segment<br> - Will add support for more date inputs in future updates<br>`;
     const scriptName = GM_info.script.name;
     const scriptVersion = GM_info.script.version;
+    const downloadUrl = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/code/WME-AD-to-BS-Converter.user.js';
+    const forumURL = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/feedback';
     let wmeSDK;
 
     const log = (message) => console.log('WME_ADtoBS: ' + message);
@@ -177,44 +181,177 @@
             bsDisplay.style.textDecoration = '';
         });
 
-        // Make BS date selectable and editable
-        bsDisplay.addEventListener('click', () => {
+        // Show BS calendar popup on click
+        bsDisplay.addEventListener('click', (e) => {
             if (!unsafeWindow.NepaliDate || typeof unsafeWindow.NepaliDate.BS_TO_AD !== 'function') {
                 log('NepaliDate library not ready for BS_TO_AD');
                 return;
             }
-            // Get current BS value (strip prefix and flag)
-            let currentText = bsDisplay.innerText.replace(/^🇳🇵 BS:\s*/, '').trim();
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(currentText)) {
-                currentText = '';
+            // Remove any existing calendar
+            document.querySelectorAll('.bs-calendar-popup').forEach(el => el.remove());
+
+            // Get current BS value or today
+            let currentBS = bsDisplay.innerText.replace(/^🇳🇵 BS:\s*/, '').trim();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(currentBS)) {
+                // fallback: use today's AD and convert to BS
+                const today = new Date();
+                const adStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+                currentBS = unsafeWindow.NepaliDate.AD_TO_BS(adStr);
             }
-            const userBS = prompt('Enter BS date (YYYY-MM-DD):', currentText);
-            if (!userBS) return;
-            // Validate format
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(userBS)) {
-                alert('Invalid format. Please use YYYY-MM-DD.');
-                return;
+            let [bsYear, bsMonth, bsDay] = currentBS.split('-').map(Number);
+            if (!bsYear || !bsMonth || !bsDay) {
+                bsYear = 2080; bsMonth = 1; bsDay = 1;
             }
-            // Convert BS to AD
-            const adDateStr = unsafeWindow.NepaliDate.BS_TO_AD(userBS);
-            log('BS_TO_AD conversion: ' + userBS + ' -> ' + adDateStr);
-            if (!adDateStr || adDateStr.includes('Error') || adDateStr.includes('Invalid')) {
-                alert('Conversion failed: ' + adDateStr);
-                return;
+
+            // Create calendar popup
+            const popup = document.createElement('div');
+            popup.className = 'bs-calendar-popup';
+            popup.style = 'position: absolute; z-index: 9999; background: #fff; border: 1px solid #aaa; border-radius: 6px; box-shadow: 0 2px 8px #0002; padding: 10px; font-size: 13px;';
+
+            // Position popup below the bsDisplay
+            const rect = bsDisplay.getBoundingClientRect();
+            popup.style.left = `${rect.left + window.scrollX}px`;
+            popup.style.top = `${rect.bottom + window.scrollY + 2}px`;
+
+            // Calendar header
+            const header = document.createElement('div');
+            header.style = 'display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;';
+            const prevMonth = document.createElement('button');
+            prevMonth.textContent = '<';
+            prevMonth.style = 'padding:2px 6px; margin-right:4px;';
+            const nextMonth = document.createElement('button');
+            nextMonth.textContent = '>';
+            nextMonth.style = 'padding:2px 6px; margin-left:4px;';
+            const ymLabel = document.createElement('span');
+            ymLabel.style = 'font-weight:bold;';
+            header.appendChild(prevMonth);
+            header.appendChild(ymLabel);
+            header.appendChild(nextMonth);
+            popup.appendChild(header);
+
+            // Calendar grid
+            const grid = document.createElement('table');
+            grid.style = 'border-collapse: collapse; width: 100%;';
+            popup.appendChild(grid);
+
+            // Helper: get days in BS month
+            function getDaysInBSMonth(year, month) {
+                // NepaliDate library may not expose this, so use a fallback (30 days)
+                // Try to get last day by incrementing day until invalid
+                let d = 1;
+                while (d <= 35) {
+                    const ad = unsafeWindow.NepaliDate.BS_TO_AD(`${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+                    if (!ad || ad.includes('Error') || ad.includes('Invalid')) break;
+                    d++;
+                }
+                return d-1;
             }
-            // Convert YYYY-MM-DD to MM/DD/YYYY for the AD input
-            const adParts = adDateStr.split('-');
-            if (adParts.length === 3) {
-                const mm = adParts[1].padStart(2, '0');
-                const dd = adParts[2].padStart(2, '0');
-                const yyyy = adParts[0];
-                const adInputVal = `${mm}/${dd}/${yyyy}`;
-                inputElem.value = adInputVal;
-                // Trigger input event to update listeners/UI
-                inputElem.dispatchEvent(new Event('input', { bubbles: true }));
-            } else {
-                alert('Unexpected AD date format: ' + adDateStr);
+
+            // Helper: render calendar
+            function renderCalendar(year, month, selectedDay) {
+                ymLabel.textContent = `${year}-${String(month).padStart(2,'0')}`;
+                // Clear grid
+                grid.innerHTML = '';
+                // Weekdays
+                const weekdays = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+                const thead = document.createElement('thead');
+                const trh = document.createElement('tr');
+                weekdays.forEach(wd => {
+                    const th = document.createElement('th');
+                    th.textContent = wd;
+                    th.style = 'padding:2px 4px; color:#888;';
+                    trh.appendChild(th);
+                });
+                thead.appendChild(trh);
+                grid.appendChild(thead);
+                // Days
+                const days = getDaysInBSMonth(year, month);
+                // Find first day of week (convert 1st of month to AD, then JS day)
+                const adFirst = unsafeWindow.NepaliDate.BS_TO_AD(`${year}-${String(month).padStart(2,'0')}-01`);
+                let firstDay = 0;
+                if (adFirst && !adFirst.includes('Error')) {
+                    const [y,m,d] = adFirst.split('-').map(Number);
+                    firstDay = new Date(y, m-1, d).getDay();
+                }
+                let tr = document.createElement('tr');
+                for (let i=0; i<firstDay; i++) {
+                    const td = document.createElement('td');
+                    td.textContent = '';
+                    tr.appendChild(td);
+                }
+                for (let day=1; day<=days; day++) {
+                    if ((firstDay + day - 1) % 7 === 0 && day !== 1) {
+                        grid.appendChild(tr);
+                        tr = document.createElement('tr');
+                    }
+                    const td = document.createElement('td');
+                    td.textContent = day;
+                    td.style = 'padding:3px 5px; text-align:center; cursor:pointer; border-radius:3px;';
+                    if (day === selectedDay) {
+                        td.style.background = '#1e88e5';
+                        td.style.color = '#fff';
+                    } else {
+                        td.addEventListener('mouseenter',()=>{td.style.background='#e3f2fd';});
+                        td.addEventListener('mouseleave',()=>{td.style.background='';});
+                    }
+                    td.addEventListener('click', () => {
+                        // On day select: convert to AD, update input, close popup
+                        const bsStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+                        const adDateStr = unsafeWindow.NepaliDate.BS_TO_AD(bsStr);
+                        log('BS_TO_AD conversion: ' + bsStr + ' -> ' + adDateStr);
+                        if (!adDateStr || adDateStr.includes('Error') || adDateStr.includes('Invalid')) {
+                            alert('Conversion failed: ' + adDateStr);
+                            return;
+                        }
+                        const adParts = adDateStr.split('-');
+                        if (adParts.length === 3) {
+                            const mm = adParts[1].padStart(2, '0');
+                            const dd = adParts[2].padStart(2, '0');
+                            const yyyy = adParts[0];
+                            const adInputVal = `${mm}/${dd}/${yyyy}`;
+                            inputElem.value = adInputVal;
+                            inputElem.dispatchEvent(new Event('input', { bubbles: true }));
+                            // Remove popup
+                            popup.remove();
+                        } else {
+                            alert('Unexpected AD date format: ' + adDateStr);
+                        }
+                    });
+                    tr.appendChild(td);
+                }
+                // Fill trailing empty cells
+                while (tr.children.length < 7) {
+                    const td = document.createElement('td');
+                    td.textContent = '';
+                    tr.appendChild(td);
+                }
+                grid.appendChild(tr);
             }
+
+            // Navigation
+            prevMonth.onclick = () => {
+                if (bsMonth === 1) { bsYear--; bsMonth = 12; } else { bsMonth--; }
+                renderCalendar(bsYear, bsMonth, null);
+            };
+            nextMonth.onclick = () => {
+                if (bsMonth === 12) { bsYear++; bsMonth = 1; } else { bsMonth++; }
+                renderCalendar(bsYear, bsMonth, null);
+            };
+
+            // Dismiss on outside click
+            function onDocClick(ev) {
+                if (!popup.contains(ev.target) && ev.target !== bsDisplay) {
+                    popup.remove();
+                    document.removeEventListener('mousedown', onDocClick);
+                }
+            }
+            setTimeout(()=>{
+                document.addEventListener('mousedown', onDocClick);
+            }, 0);
+
+            // Add to body
+            document.body.appendChild(popup);
+            renderCalendar(bsYear, bsMonth, bsDay);
         });
 
         // Insert after the .date-time-picker container
@@ -304,16 +441,24 @@
         }
     }
 
-    // Existing update monitor logic...
-    function scriptupdatemonitor() {
-        if (WazeToastr?.Ready) {
-            const updateMonitor = new WazeToastr.Alerts.ScriptUpdateMonitor(
-                scriptName, scriptVersion, GM_info.script.downloadURL, GM_xmlhttpRequest, GM_info.script.downloadURL, /@version\s+(.+)/i
-            );
-            updateMonitor.start(2, true);
-        } else {
-            setTimeout(scriptupdatemonitor, 250);
-        }
+  function scriptupdatemonitor() {
+    if (WazeToastr?.Ready) {
+      // Create and start the ScriptUpdateMonitor
+      const updateMonitor = new WazeToastr.Alerts.ScriptUpdateMonitor(scriptName, scriptVersion, downloadUrl, GM_xmlhttpRequest);
+      updateMonitor.start(2, true); // Check every 2 hours, check immediately
+ 
+      // Show the update dialog for the current version
+      WazeToastr.Interface.ShowScriptUpdate(scriptName, scriptVersion, updateMessage, downloadUrl, forumURL);
+    } else {
+      setTimeout(scriptupdatemonitor, 250);
     }
-    scriptupdatemonitor();
+  }
+  scriptupdatemonitor();
+  console.log(`${scriptName} initialized.`);
 })();
+
+/******** Version changelog  ********
+Version 0.1.4 - 2026-01-24
+    - Currently supports for native UI for closure segment<br> - Will add support for more date inputs in future updates
+    
+*********************/
