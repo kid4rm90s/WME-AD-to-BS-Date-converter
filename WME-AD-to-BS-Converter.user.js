@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME AD to BS Converter
 // @namespace    https://greasyfork.org/users/1087400
-// @version      0.1.6
+// @version      0.1.7
 // @description  Converts AD dates to BS dates in WME closure panel
 // @author       https://greasyfork.org/en/users/1087400-kid4rm90s
 // @include 	   /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
@@ -25,14 +25,14 @@
 (function main() {
     'use strict';
 
-  const updateMessage = `<strong>Version 0.1.6 - 2026-01-25:</strong><br>
+    const scriptName = GM_info.script.name;
+    const scriptVersion = GM_info.script.version;
+    const updateMessage = `<strong>Version ${scriptVersion} - 2026-01-25:</strong><br>
     - Added support for various WME Locales<br>
     - Added Nepali calendar display support<br>
     - Added an option to choose between Nepali and English calendar display in the script tab<br>
     - Fixed date conversion issues due to timezone discrepancies<br>
     - Fixed various minor bugs and improved stability`;
-    const scriptName = GM_info.script.name;
-    const scriptVersion = GM_info.script.version;
     const downloadUrl = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/code/WME-AD-to-BS-Converter.user.js';
     const forumURL = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/feedback';
     let wmeSDK;
@@ -136,6 +136,7 @@
         tabContent.style.padding = '12px';
         tabContent.innerHTML = `
             <h3 style="margin-top:0">WME AD↔BS Converter</h3>
+            <h7> Version ${scriptVersion}</h7><br><br>
             <label style="font-weight:bold;">Nepali Calendar Display:</label><br>
             <label><input type="radio" name="wme-ad-bs-lang" value="ne" checked> नेपाली (Devanagari)</label><br>
             <label><input type="radio" name="wme-ad-bs-lang" value="en"> English</label>
@@ -316,7 +317,7 @@
                 weekdayLabels.forEach(wd => {
                     const th = document.createElement('th');
                     th.textContent = wd;
-                    th.style = 'padding:2px 4px; color:#888;';
+                    th.style = 'padding:2px 4px; color: #000000;';
                     trh.appendChild(th);
                 });
                 thead.appendChild(trh);
@@ -582,7 +583,7 @@
 })();
 
 /******** Version changelog  ********
-Version 0.1.6 - 2026-01-25:
+Version 0.1.6-7 - 2026-01-25:
     - Added support for various WME Locales
     - Added Nepali calendar display support
     - Added an option to choose between Nepali and English calendar display in the script tab
