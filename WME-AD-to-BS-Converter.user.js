@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME AD to BS Converter
 // @namespace    https://greasyfork.org/users/1087400
-// @version      0.1.9
+// @version      0.2.0
 // @description  Converts AD dates to BS dates in WME closure panel
 // @author       https://greasyfork.org/en/users/1087400-kid4rm90s
 // @include 	   /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
@@ -27,8 +27,8 @@
 
     const scriptName = GM_info.script.name;
     const scriptVersion = GM_info.script.version;
-    const updateMessage = `<strong>Version ${scriptVersion} - 2026-01-25:</strong><br>
-    - Added support for WME Advanced Closures script's calender date to BS conversion<br>
+    const updateMessage = `<strong>Version ${scriptVersion} - 2026-01-26:</strong><br>
+    - Now it will able to convert all the native WME calenders into BS calenders<br>
     - Fixed date conversion format issue<br>
     - Fixed various minor bugs and improved stability`;
     const downloadUrl = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/code/WME-AD-to-BS-Converter.user.js';
@@ -218,14 +218,13 @@
             mutations.forEach((mutation) => {
                 mutation.addedNodes.forEach((node) => {
                     if (node.nodeType === Node.ELEMENT_NODE) {
-                        // Look for Closure Date Inputs
-                        const startInput = node.querySelector('#closure_startDate');
-                        const endInput = node.querySelector('#closure_endDate');
-                        const advStartInput = node.querySelector('#wmeac-advanced-closure-dialog-rangestartdate');
-                        const advEndInput = node.querySelector('#wmeac-advanced-closure-dialog-rangeenddate');
-
-                        if (startInput) setupDateDisplay(startInput);
-                        if (endInput) setupDateDisplay(endInput);
+                        // Native WME UI: all date-picker-inputs (by class)
+                        node.querySelectorAll && node.querySelectorAll('.date-picker-input').forEach(inputElem => {
+                            if (inputElem instanceof HTMLElement) setupDateDisplay(inputElem);
+                        });
+                        // Advanced Closures (by ID)
+                        const advStartInput = node.querySelector && node.querySelector('#wmeac-advanced-closure-dialog-rangestartdate');
+                        const advEndInput = node.querySelector && node.querySelector('#wmeac-advanced-closure-dialog-rangeenddate');
                         if (advStartInput) setupDateDisplay(advStartInput);
                         if (advEndInput) setupDateDisplay(advEndInput);
                     }
@@ -241,6 +240,7 @@
 
         // Fallback: periodically check for advanced closure inputs and inject if missing
         setInterval(() => {
+            // Advanced Closures (by ID)
             const advStartInput = document.getElementById('wmeac-advanced-closure-dialog-rangestartdate');
             if (advStartInput && !document.getElementById('wmeac-advanced-closure-dialog-rangestartdate-bs-val')) {
                 setupDateDisplay(advStartInput);
@@ -249,6 +249,13 @@
             if (advEndInput && !document.getElementById('wmeac-advanced-closure-dialog-rangeenddate-bs-val')) {
                 setupDateDisplay(advEndInput);
             }
+
+            // Native WME UI: all date-picker-inputs (by class)
+            document.querySelectorAll('.date-picker-input').forEach(inputElem => {
+                if (inputElem instanceof HTMLElement && !document.getElementById(inputElem.id + '-bs-val')) {
+                    setupDateDisplay(inputElem);
+                }
+            });
         }, 1500);
 
         log('Observer started on edit-panel');
@@ -695,6 +702,10 @@
 })();
 
 /******** Version changelog  ********
+Version 0.2.0 - 2026-01-26:
+    - Now it will able to convert all the native WME calenders into BS calenders<br>
+    - Fixed date conversion format issue<br>
+    - Fixed various minor bugs and improved stability
 Version 0.1.9 - 2026-01-26:
     - Added support for WME Advanced Closures script's calender date to BS conversion<br>
     - Fixed date conversion format issue<br>
