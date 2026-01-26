@@ -186,6 +186,17 @@
         tabContent.addEventListener('change', (e) => {
             if (e.target && e.target.name === 'wme-ad-bs-lang') {
                 setTimeout(updateTodayNPL, 100);
+                // Update advanced closure BS displays on language change
+                const advStartInput = document.getElementById('wmeac-advanced-closure-dialog-rangestartdate');
+                const advEndInput = document.getElementById('wmeac-advanced-closure-dialog-rangeenddate');
+                if (advStartInput) {
+                    const advStartDisplay = document.getElementById('wmeac-advanced-closure-dialog-rangestartdate-bs-val');
+                    if (advStartDisplay) updateBSValue(advStartInput, advStartDisplay);
+                }
+                if (advEndInput) {
+                    const advEndDisplay = document.getElementById('wmeac-advanced-closure-dialog-rangeenddate-bs-val');
+                    if (advEndDisplay) updateBSValue(advEndInput, advEndDisplay);
+                }
             }
         });
     }
@@ -293,7 +304,7 @@
             document.querySelectorAll('.bs-calendar-popup').forEach(el => el.remove());
 
             // Get current BS value or today
-            let currentBS = bsDisplay.innerText.replace(/^🇳🇵 BS:\s*/, '').trim();
+            let currentBS = bsDisplay.innerText.replace(/^BS:\s*/, '').trim();
             if (!/^\d{4}-\d{2}-\d{2}$/.test(currentBS)) {
                 // fallback: use today's AD and convert to BS
                 const today = new Date();
@@ -671,9 +682,9 @@
                 if (calendarLang === 'ne') {
                     // Convert all numbers to Devanagari and label to Nepali
                     const devanagari = (str) => str.replace(/\d/g, d => '०१२३४५६७८९'[d]);
-                    displayElem.innerText = `🇳🇵 बि.सं.: ${devanagari(bsDateStr)}`;
+                    displayElem.innerText = `बि.सं.: ${devanagari(bsDateStr)}`;
                 } else {
-                    displayElem.innerText = `🇳🇵 BS: ${bsDateStr}`;
+                    displayElem.innerText = `BS: ${bsDateStr}`;
                 }
             } else {
                 displayElem.innerText = `BS Date: ${bsDateStr}`;
