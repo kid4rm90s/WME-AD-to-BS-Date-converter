@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME AD to BS Converter
 // @namespace    https://greasyfork.org/users/1087400
-// @version      0.2.2
+// @version      0.2.3
 // @description  Converts AD dates to BS dates in WME closure panel
 // @author       https://greasyfork.org/en/users/1087400-kid4rm90s
 // @include 	   /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
@@ -282,8 +282,8 @@
     const SCRIPT_PREFIX = 'WME_ADtoBS';
     const scriptName = GM_info.script.name;
     const scriptVersion = GM_info.script.version;
-    const updateMessage = `<strong>Version ${scriptVersion} - 2026-02-09:</strong><br>
-    - Now properly apply dates for both regular date inputs and closure start/end dates<br>
+    const updateMessage = `<strong>Version ${scriptVersion} - 2026-03-15:</strong><br>
+    - Added Nepali Public Holidays<br>
     - Code cleanup for various minor bugs and improved stability`;
     const downloadUrl = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/code/WME-AD-to-BS-Converter.user.js';
     const forumURL = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/feedback';
@@ -1515,6 +1515,8 @@
 })();
 
 /******** Version changelog  ********
+Version 0.2.2 - 2026-03-05:
+    - Added Nepali Public Holidays<br>
 Version 0.2.1 - 2026-02-09:
     - Now properly apply dates for both regular date inputs and closure start/end dates<br>
     - Code cleanup for various minor bugs and improved stability
