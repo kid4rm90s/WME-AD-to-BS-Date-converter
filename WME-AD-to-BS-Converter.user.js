@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME AD to BS Converter
 // @namespace    https://greasyfork.org/users/1087400
-// @version      0.2.1
+// @version      0.2.3
 // @description  Converts AD dates to BS dates in WME closure panel
 // @author       https://greasyfork.org/en/users/1087400-kid4rm90s
 // @include 	   /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
@@ -26,13 +26,264 @@
     'use strict';
 
     // =================================================================
+    // INJECT DARK MODE CSS
+    // =================================================================
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = `
+        /* ========== CALENDAR POPUP - LIGHT MODE ========== */
+        .bs-calendar-popup {
+            background: #fff;
+            border-color: #aaa;
+            color: #333;
+        }
+        
+        .bs-calendar-popup table {
+            color: #000;
+        }
+        
+        .bs-calendar-popup thead th {
+            color: #000;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .bs-calendar-popup tbody td {
+            color: #000;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .bs-calendar-popup button {
+            background: #fff;
+            color: #333;
+            border-color: #ccc;
+        }
+        
+        .bs-calendar-popup button:hover {
+            background: #f5f5f5;
+        }
+        
+        .bs-calendar-popup span {
+            color: #000;
+        }
+        
+        /* ========== TAB CONTENT - LIGHT MODE ========== */
+        #wme-ad-bs-tab {
+            color: #333;
+        }
+        
+        #wme-ad-bs-tab label {
+            color: #333;
+        }
+        
+        #wme-ad-bs-tab h3,
+        #wme-ad-bs-tab h4,
+        #wme-ad-bs-tab h7,
+        #wme-ad-bs-tab h8 {
+            color: #000;
+        }
+        
+        #wme-ad-bs-tab select {
+            background: #fff;
+            color: #333;
+            border-color: #ccc;
+        }
+        
+        #wme-ad-bs-holiday-list {
+            background: #f9f9f9;
+            border-color: #ddd;
+            color: #333;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 10px;
+        }
+        
+        #sidebar #wme-ad-bs-holiday-list div {
+            color: #333;
+            padding: 8px;
+            border-bottom: 1px solid #bbb !important;
+            font-size: 12px;
+            margin: 0;
+        }
+        
+        #sidebar #wme-ad-bs-holiday-list strong {
+            color: #000;
+        }
+        
+        #sidebar small {
+            color: #666 !important;
+            font-size: 12px !important;
+        }
+        
+        #wme-ad-bs-holiday-list p {
+            color: #6e6e6e !important;
+            font-size: 12px !important;
+        }
+        
+        /* ========== BS DATE DISPLAY - LIGHT MODE ========== */
+        .wme-ad-bs-today-display {
+            color: #1e88e5;
+        }
+        
+        /* ========== CALENDAR POPUP - DARK MODE ========== */
+        [wz-theme="dark"] .bs-calendar-popup {
+            background: var(--background_default, #202124) !important;
+            border-color: var(--always_dark_inactive, #55595e) !important;
+            color: var(--content_default, #e8eaed) !important;
+        }
+        
+        [wz-theme="dark"] .bs-calendar-popup table {
+            color: var(--content_p1, #d5d7db);
+        }
+        
+        [wz-theme="dark"] .bs-calendar-popup thead {
+            background: var(--background_default, #202124);
+        }
+        
+        [wz-theme="dark"] .bs-calendar-popup thead th {
+            color: var(--content_p1, #d5d7db);
+            background: var(--background_default, #202124);
+            border-bottom-color: var(--always_dark_inactive, #55595e);
+        }
+        
+        [wz-theme="dark"] .bs-calendar-popup tbody td {
+            color: var(--content_p1, #d5d7db);
+            border-color: var(--always_dark_inactive, #55595e);
+            background: var(--surface_default, #3c4043);
+        }
+        
+        [wz-theme="dark"] .bs-calendar-popup tbody td:hover {
+            background: var(--always_dark_inactive, #55595e) !important;
+        }
+        
+        [wz-theme="dark"] .bs-calendar-popup button {
+            background: var(--background_default, #202124);
+            color: var(--content_p1, #d5d7db);
+            border-color: var(--always_dark_inactive, #55595e);
+        }
+        
+        [wz-theme="dark"] .bs-calendar-popup button:hover {
+            background: var(--always_dark_inactive, #55595e);
+            border-color: var(--content_p2, #b7babf);
+        }
+        
+        [wz-theme="dark"] .bs-calendar-popup span {
+            color: var(--content_p1, #d5d7db);
+        }
+        
+        /* ========== TAB CONTENT - DARK MODE ========== */
+        [wz-theme="dark"] #wme-ad-bs-tab {
+            color: var(--content_p1, #d5d7db);
+        }
+        
+        [wz-theme="dark"] #wme-ad-bs-tab label {
+            color: var(--content_p1, #d5d7db);
+        }
+        
+        [wz-theme="dark"] #wme-ad-bs-tab h3,
+        [wz-theme="dark"] #wme-ad-bs-tab h4,
+        [wz-theme="dark"] #wme-ad-bs-tab h7,
+        [wz-theme="dark"] #wme-ad-bs-tab h8 {
+            color: var(--content_p1, #d5d7db);
+        }
+        
+        [wz-theme="dark"] #wme-ad-bs-tab select {
+            background: var(--surface_default, #3c4043);
+            color: var(--content_p1, #d5d7db);
+            border-color: var(--always_dark_inactive, #55595e);
+        }
+        
+        [wz-theme="dark"] #wme-ad-bs-tab select:focus {
+            border-color: var(--content_p2, #b7babf);
+            box-shadow: 0 0 0 3px rgba(99, 125, 153, 0.1);
+        }
+        
+        [wz-theme="dark"] #wme-bs-holiday-year {
+            background: var(--surface_default, #3c4043) !important;
+            color: var(--content_p1, #d5d7db) !important;
+            border-color: var(--always_dark_inactive, #55595e) !important;
+        }
+        
+        /* Holiday section border */
+        [wz-theme="dark"] .wme-ad-bs-holiday-section {
+            border-top-color: var(--always_dark_inactive, #55595e) !important;
+        }
+        
+        .wme-ad-bs-holiday-section {
+            border-top: 1px solid #ccc;
+            margin-top: 20px;
+            padding-top: 15px;
+        }
+        
+        [wz-theme="dark"] #wme-ad-bs-tab a {
+            color: #64b5f6 !important;
+        }
+        
+        [wz-theme="dark"] #wme-ad-bs-holiday-list {
+            background: var(--background_default, #202124) !important;
+            color: var(--content_p1, #d5d7db) !important;
+            border-color: var(--always_dark_inactive, #55595e) !important;
+            margin-top: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid var(--always_dark_inactive, #55595e) !important;
+            border-radius: 3px;
+            padding: 10px;
+        }
+        
+        [wz-theme="dark"] #sidebar #wme-ad-bs-holiday-list {
+            background: var(--background_default, #202124) !important;
+            color: var(--content_p1, #d5d7db) !important;
+            border-color: var(--always_dark_inactive, #55595e) !important;
+        }
+        
+        [wz-theme="dark"] #sidebar #wme-ad-bs-holiday-list div {
+            color: var(--content_p1, #d5d7db) !important;
+            border-bottom: 1px solid #cecdcd !important;
+            padding: 8px;
+            font-size: 12px;
+            margin: 0;
+        }
+        
+        [wz-theme="dark"] #sidebar #wme-ad-bs-holiday-list strong {
+            color: var(--content_p1, #d5d7db) !important;
+        }
+        
+        [wz-theme="dark"] #sidebar small {
+            color: var(--content_p2, #b7babf) !important;
+            font-size: 12px !important;
+        }
+        
+        [wz-theme="dark"] #sidebar #wme-ad-bs-holiday-list p {
+            color: var(--content_p2, #b7babf) !important;
+            font-size: 12px !important;
+        }
+        
+        /* ========== BS DATE DISPLAY - DARK MODE ========== */
+        [wz-theme="dark"] .wme-ad-bs-today-display {
+            color: #64b5f6;
+        }
+        
+        /* Holiday/Saturday highlighting adjustments for dark mode */
+        [wz-theme="dark"] .bs-calendar-popup tbody td[style*="FFE6E6"],
+        [wz-theme="dark"] .bs-calendar-popup tbody td[style*="FFFACD"],
+        [wz-theme="dark"] .bs-calendar-popup tbody td[style*="E6F2FF"] {
+            filter: brightness(0.7) !important;
+            color: #000 !important;
+        }
+    `;
+    document.head.appendChild(styleSheet);
+
+    // =================================================================
     // CONSTANTS
     // =================================================================
     const SCRIPT_PREFIX = 'WME_ADtoBS';
     const scriptName = GM_info.script.name;
     const scriptVersion = GM_info.script.version;
-    const updateMessage = `<strong>Version ${scriptVersion} - 2026-02-09:</strong><br>
-    - Now properly apply dates for both regular date inputs and closure start/end dates<br>
+    const updateMessage = `<strong>Version ${scriptVersion} - 2026-03-15:</strong><br>
+    - Added Nepali Public Holidays<br>
     - Code cleanup for various minor bugs and improved stability`;
     const downloadUrl = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/code/WME-AD-to-BS-Converter.user.js';
     const forumURL = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/feedback';
@@ -146,6 +397,7 @@
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: 'https://kid4rm90s.github.io/NepaliBStoAD/NepaliBStoAD.js',
+                //url: 'https://raw.githubusercontent.com/kid4rm90s/NepaliBStoAD/beta/NepaliBStoAD.js',
                 timeout: TIMING.REQUEST_TIMEOUT,
                 onload: function(response) {
                     try {
@@ -220,6 +472,46 @@
     unsafeWindow.SDK_INITIALIZED.then(initScript);
 
     // =================================================================
+    // HOLIDAY UTILITIES
+    // =================================================================
+
+    /**
+     * Gets holiday information for a given BS date
+     * @param {string} bsDate - Date in YYYY-MM-DD format
+     * @returns {Object|null} - Holiday object or null
+     */
+    const getHolidayInfo = (bsDate) => {
+        if (!isNepaliDateAvailable()) return null;
+        try {
+            return unsafeWindow.NepaliDate.isHolidayBS(bsDate);
+        } catch (e) {
+            return null;
+        }
+    };
+
+    /**
+     * Gets emoji icon based on holiday type
+     */
+    const getHolidayIcon = (type) => {
+        const icons = {
+            'national': '🟢',
+            'religious': '🟡',
+            'observance': '🔵'
+        };
+        return icons[type] || '⭐';
+    };
+
+    /**
+     * Formats holiday display text
+     */
+    const formatHolidayDisplay = (holiday, lang = 'en') => {
+        if (!holiday) return '';
+        const name = lang === 'ne' ? holiday.nameNep : holiday.nameEng;
+        const icon = getHolidayIcon(holiday.type);
+        return ` ${icon} ${name}`;
+    };
+
+    // =================================================================
     // UI COMPONENTS
     // =================================================================
     
@@ -244,14 +536,92 @@
             <label><input type="radio" name="wme-ad-bs-lang" value="ne" checked> नेपाली (Devanagari)</label><br>
             <label><input type="radio" name="wme-ad-bs-lang" value="en"> English</label>
             <div id="wme-ad-bs-today" style="margin-top:10px; font-size:13px; font-weight:bold;"></div>
-            <br><br><h8> For feedback: <a href="${forumURL}" target="_blank" style="color:#1e88e5; text-decoration:underline;">${forumURL}</a></h8><br>
         `;
         tabContent.id = ELEMENT_IDS.SCRIPT_TAB;
+        
+        // ========== HOLIDAY SECTION ==========
+        const holidaySection = document.createElement('div');
+        holidaySection.className = 'wme-ad-bs-holiday-section';
+        
+        holidaySection.innerHTML = `
+            <h4 style="margin-top:0; margin-bottom:10px;">📅 Nepali Holidays</h4>
+            <label style="font-size:12px;">Year: 
+                <select id="wme-bs-holiday-year" style="padding:4px; font-size:12px;">
+                </select>
+            </label>
+            <div id="wme-bs-holiday-list"></div>
+            <br><br><h8> For feedback: <a href="${forumURL}" target="_blank" style="color:#1e88e5; text-decoration:underline;">${forumURL}</a></h8><br>
+        `;
+        
+        tabContent.appendChild(holidaySection);
+        
+        // Populate year dropdown
+        const availableYears = unsafeWindow.NepaliDate?.getAvailableYears?.() || [2082];
+        const yearSelect = holidaySection.querySelector('#wme-bs-holiday-year');
+        availableYears.forEach(year => {
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = `${year} BS`;
+            yearSelect.appendChild(option);
+        });
+        
+        // Set current year as default
+        const currentYear = unsafeWindow.NepaliDate?.todayBS?.()?.split('-')[0];
+        if (currentYear && availableYears.includes(parseInt(currentYear))) {
+            yearSelect.value = currentYear;
+        }
+        
+        // Display holidays for selected year
+        function displayHolidaysForYear() {
+            const year = parseInt(yearSelect.value);
+            const holidays = unsafeWindow.NepaliDate?.getHolidaysForYear?.(year) || [];
+            const listDiv = holidaySection.querySelector('#wme-bs-holiday-list');
+            
+            if (holidays.length === 0) {
+                listDiv.innerHTML = '<p>No holidays available for this year</p>';
+                return;
+            }
+            
+            let html = '';
+            holidays.forEach((holiday, index) => {
+                const name = calendarLang === 'ne' ? holiday.nameNep : holiday.nameEng;
+                const bsDate = calendarLang === 'ne' ? toDevanagari(holiday.bsDate) : holiday.bsDate;
+                const typeIcon = getHolidayIcon(holiday.type);
+                
+                html += `<div>
+                    <strong>${typeIcon} ${name}</strong><br>
+                    <small>
+                        ${bsDate} BS | ${holiday.adDate} AD
+                    </small>
+                </div>`;
+                
+                // Add separator between holidays (but not after the last one)
+                if (index < holidays.length - 1) {
+                    html += `<div style="text-align: center; color: #999; margin: 8px 0; font-size: 11px;">----------------------------------------------</div>`;
+                }
+            });
+            
+            listDiv.innerHTML = html;
+        }
+        
+        // Event listener for language and year selection
         tabContent.addEventListener('change', (e) => {
             if (e.target && e.target.name === 'wme-ad-bs-lang') {
                 calendarLang = e.target.value;
+                displayHolidaysForYear();
             }
         });
+        
+        // Event listener for year selection
+        yearSelect.addEventListener('change', () => {
+            displayHolidaysForYear();
+        });
+        
+        // Display initial holidays
+        if (availableYears.length > 0) {
+            displayHolidaysForYear();
+        }
+        
         tabPane.appendChild(tabContent);
 
         /**
@@ -575,7 +945,8 @@
                 tr = document.createElement('tr');
             }
             
-            const td = createDayCell(day, year, month, selectedDay, numFn, inputElem, popup);
+            const dayOfWeek = (firstDay + day - 1) % 7;
+            const td = createDayCell(day, year, month, selectedDay, numFn, inputElem, popup, dayOfWeek);
             tr.appendChild(td);
         }
         
@@ -597,24 +968,78 @@
      * @param {Function} numFn - Number formatting function
      * @param {HTMLElement} inputElem - The input element
      * @param {HTMLElement} popup - The popup element
+     * @param {number} dayOfWeek - Day of week (0=Sunday, 6=Saturday)
      * @returns {HTMLElement} - The day cell
      */
-    function createDayCell(day, year, month, selectedDay, numFn, inputElem, popup) {
+    function createDayCell(day, year, month, selectedDay, numFn, inputElem, popup, dayOfWeek) {
         const td = document.createElement('td');
         td.textContent = numFn(day);
         td.style = 'padding:3px 5px; text-align:center; cursor:pointer; border-radius:3px;';
         
+        // Check if this date is a holiday
+        const bsDateStr = `${year}-${padZero(month)}-${padZero(day)}`;
+        const holiday = getHolidayInfo(bsDateStr);
+        
+        // Check if it's Saturday (day 6 in 0-6 week: Sun=0, Mon=1, Tue=2, Wed=3, Thu=4, Fri=5, Sat=6)
+        const isSaturday = dayOfWeek === 6;
+        
         if (day === selectedDay) {
             td.style.background = '#1e88e5';
-            td.style.color = '#fff';
+            td.style.color = '#ffffff';
         } else {
-            td.addEventListener('mouseenter', () => { td.style.background = '#e3f2fd'; });
-            td.addEventListener('mouseleave', () => { td.style.background = ''; });
+            td.addEventListener('mouseenter', () => { 
+                if (!holiday && !isSaturday) {
+                    td.style.background = '#e3f2fd'; 
+                }
+            });
+            td.addEventListener('mouseleave', () => { 
+                if (holiday) {
+                    td.style.background = getHolidayBackgroundColor(holiday.type);
+                } else if (isSaturday) {
+                    td.style.background = '#FFE6E6';
+                } else {
+                    td.style.background = '';
+                }
+            });
+        }
+        
+        // Add holiday styling and tooltip
+        if (holiday) {
+            const holidayName = calendarLang === 'ne' ? holiday.nameNep : holiday.nameEng;
+            const holidayType = holiday.type;
+            td.title = `🎉 ${holidayName} (${holidayType})`;
+            td.style.background = getHolidayBackgroundColor(holidayType);
+            td.style.fontWeight = 'bold';
+            td.style.borderColor = '#999';
+            td.style.border = '1px solid #999';
+            td.style.color = '#ff0000';
+        } else if (isSaturday) {
+            // Mark Saturday with red background
+            td.title = '📅 Saturday';
+            td.style.background = '#FFE6E6';
+            td.style.fontWeight = 'bold';
+            td.style.borderColor = '#999';
+            td.style.border = '1px solid #999';
+            td.style.color = '#ff0000';
         }
         
         td.addEventListener('click', () => handleDaySelect(day, year, month, inputElem, popup));
         
         return td;
+    }
+    
+    /**
+     * Gets background color for holiday type
+     * @param {string} type - Holiday type
+     * @returns {string} - Background color
+     */
+    function getHolidayBackgroundColor(type) {
+        const colors = {
+            'national': '#FFE6E6',
+            'religious': '#FFFACD',
+            'observance': '#E6F2FF'
+        };
+        return colors[type] || '#F0F0F0';
     }
     
     /**
@@ -845,6 +1270,7 @@
     function createBSDisplayElement(containerId) {
         const bsDisplay = document.createElement('div');
         bsDisplay.id = containerId;
+        bsDisplay.className = 'wme-ad-bs-today-display';
         bsDisplay.style = 'color: #1e88e5; font-size: 13px; margin-top: 4px; font-weight: bold; padding-left: 5px; cursor: pointer; user-select: text; z-index: 1000; border-radius: 3px;';
         bsDisplay.innerText = 'BS Date: --';
 
@@ -1089,6 +1515,8 @@
 })();
 
 /******** Version changelog  ********
+Version 0.2.2 - 2026-03-05:
+    - Added Nepali Public Holidays<br>
 Version 0.2.1 - 2026-02-09:
     - Now properly apply dates for both regular date inputs and closure start/end dates<br>
     - Code cleanup for various minor bugs and improved stability
