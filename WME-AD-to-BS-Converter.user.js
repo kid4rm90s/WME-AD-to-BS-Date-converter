@@ -396,8 +396,8 @@
             log('Fetching NepaliDate library from GitHub...');
             GM_xmlhttpRequest({
                 method: 'GET',
-                //url: 'https://kid4rm90s.github.io/NepaliBStoAD/NepaliBStoAD.js',
-                url: 'https://raw.githubusercontent.com/kid4rm90s/NepaliBStoAD/beta/NepaliBStoAD.js',
+                url: 'https://kid4rm90s.github.io/NepaliBStoAD/NepaliBStoAD.js',
+                //url: 'https://raw.githubusercontent.com/kid4rm90s/NepaliBStoAD/beta/NepaliBStoAD.js',
                 timeout: TIMING.REQUEST_TIMEOUT,
                 onload: function(response) {
                     try {
