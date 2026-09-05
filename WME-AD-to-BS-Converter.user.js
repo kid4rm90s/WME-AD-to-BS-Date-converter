@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME AD to BS Converter
 // @namespace    https://greasyfork.org/users/1087400
-// @version      0.2.3
+// @version      0.2.6
 // @description  Converts AD dates to BS dates in WME closure panel
 // @author       https://greasyfork.org/en/users/1087400-kid4rm90s
 // @include 	   /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
@@ -266,6 +266,41 @@
             color: #64b5f6;
         }
         
+        /* ========== TOOLBAR DATE/TIME CLOCK - LIGHT MODE ========== */
+        .wme-ad-bs-toolbar-clock {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            height: 100%;
+            padding: 0 10px;
+            margin-right: 2px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #3c4043;
+            white-space: nowrap;
+            user-select: none;
+            border-right: 1px solid rgba(0, 0, 0, 0.12);
+        }
+        
+        .wme-ad-bs-toolbar-clock .wme-ad-bs-clock-time {
+            color: #1e88e5;
+            font-variant-numeric: tabular-nums;
+        }
+        
+        .wme-ad-bs-toolbar-clock .wme-ad-bs-clock-holiday {
+            margin-left: 2px;
+        }
+        
+        /* ========== TOOLBAR DATE/TIME CLOCK - DARK MODE ========== */
+        [wz-theme="dark"] .wme-ad-bs-toolbar-clock {
+            color: var(--content_p1, #d5d7db);
+            border-right-color: rgba(255, 255, 255, 0.15);
+        }
+        
+        [wz-theme="dark"] .wme-ad-bs-toolbar-clock .wme-ad-bs-clock-time {
+            color: #64b5f6;
+        }
+        
         /* Holiday/Saturday highlighting adjustments for dark mode */
         [wz-theme="dark"] .bs-calendar-popup tbody td[style*="FFE6E6"],
         [wz-theme="dark"] .bs-calendar-popup tbody td[style*="FFFACD"],
@@ -282,9 +317,11 @@
     const SCRIPT_PREFIX = 'WME_ADtoBS';
     const scriptName = GM_info.script.name;
     const scriptVersion = GM_info.script.version;
-    const updateMessage = `<strong>Version ${scriptVersion} - 2026-03-15:</strong><br>
-    - Added Nepali Public Holidays<br>
-    - Code cleanup for various minor bugs and improved stability`;
+    const updateMessage = `<strong>Version ${scriptVersion} - 2026-09-05:</strong><br>
+    - Added a live Nepali (BS) date &amp; time clock to the toolbar<br>
+    - Added 'Show date &amp; time in toolbar' option in the script tab (preference is remembered)<br>
+    - Script tab date/time now stays in sync with the toolbar clock<br>
+    - Various bug fixes and improved stability`;
     const downloadUrl = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/code/WME-AD-to-BS-Converter.user.js';
     const forumURL = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/feedback';
     
@@ -318,7 +355,13 @@
         ADVANCED_END: 'wmeac-advanced-closure-dialog-rangeenddate',
         SCRIPT_TAB: 'wme-ad-bs-tab',
         TODAY_DISPLAY: 'wme-ad-bs-today',
-        EDIT_PANEL: 'edit-panel'
+        EDIT_PANEL: 'edit-panel',
+        TOOLBAR_CLOCK: 'wme-ad-bs-toolbar-clock'
+    };
+
+    // User settings keys (persisted in GM storage)
+    const SETTINGS = {
+        TOOLBAR_CLOCK: 'toolbarClockEnabled'
     };
     
     // =================================================================
@@ -326,6 +369,7 @@
     // =================================================================
     let wmeSDK;
     let calendarLang = 'ne'; // 'ne' (Nepali) or 'en' (English)
+    let toolbarClockEnabled = !!GM_getValue(SETTINGS.TOOLBAR_CLOCK, true); // 'Show date & time in toolbar'
     let _wmeLocale = null;
     let _wmeRegion = null;
 
@@ -529,13 +573,15 @@
 
         const tabContent = document.createElement('div');
         tabContent.style.padding = '12px';
+        const toolbarChecked = toolbarClockEnabled ? 'checked' : '';
         tabContent.innerHTML = `
             <h3 style="margin-top:0">WME AD↔BS Converter</h3>
-            <h7> Version ${scriptVersion}</h7><br><br>
+            <h7> Version ${scriptVersion}</h7><br>
             <label style="font-weight:bold;">Nepali Calendar Display:</label><br>
             <label><input type="radio" name="wme-ad-bs-lang" value="ne" checked> नेपाली (Devanagari)</label><br>
-            <label><input type="radio" name="wme-ad-bs-lang" value="en"> English</label>
-            <div id="wme-ad-bs-today" style="margin-top:10px; font-size:13px; font-weight:bold;"></div>
+            <label><input type="radio" name="wme-ad-bs-lang" value="en"> English</label><br>
+            <label style="font-size:13px;"><input type="checkbox" id="wme-ad-bs-toolbar-toggle" ${toolbarChecked}> Show date &amp; time in toolbar</label>
+            <div id="wme-ad-bs-today" style="margin-top:8px; font-size:13px; font-weight:bold;"></div>
         `;
         tabContent.id = ELEMENT_IDS.SCRIPT_TAB;
         
@@ -609,6 +655,7 @@
             if (e.target && e.target.name === 'wme-ad-bs-lang') {
                 calendarLang = e.target.value;
                 displayHolidaysForYear();
+                refreshToolbarClock();
             }
         });
         
@@ -616,6 +663,14 @@
         yearSelect.addEventListener('change', () => {
             displayHolidaysForYear();
         });
+
+        // Event listener for showing/hiding the toolbar date/time clock
+        const toolbarToggle = tabContent.querySelector('#wme-ad-bs-toolbar-toggle');
+        if (toolbarToggle) {
+            toolbarToggle.addEventListener('change', () => {
+                setToolbarClockEnabled(toolbarToggle.checked);
+            });
+        }
         
         // Display initial holidays
         if (availableYears.length > 0) {
@@ -627,38 +682,29 @@
         /**
          * Updates the current Nepal date/time display
          */
+        /**
+         * Updates the current Nepal date/time display in the script tab.
+         * Mirrors the toolbar clock so both show identical live content and
+         * tick together (including seconds).
+         */
         function updateTodayNPL() {
             const todayDiv = document.getElementById(ELEMENT_IDS.TODAY_DISPLAY);
             if (!todayDiv) return;
-            
-            const adNow = new Date();
-            const nplNow = new Date(adNow.getTime() + NEPAL_TIMEZONE_OFFSET_MINUTES * 60000);
-            const adStr = `${nplNow.getUTCFullYear()}-${padZero(nplNow.getUTCMonth() + 1)}-${padZero(nplNow.getUTCDate())}`;
-            const timeStr = `${padZero(nplNow.getUTCHours())}:${padZero(nplNow.getUTCMinutes())}`;
-            let bsHtml = '<span style="color:#1e88e5">--</span>';
-            let timeHtml = '<span style="color:#1e88e5">--</span>';
-            
-            if (isNepaliDateAvailable()) {
-                let bsStr = unsafeWindow.NepaliDate.AD_TO_BS(adStr);
-                let displayTime = timeStr;
-                
-                // Convert to Devanagari if Nepali selected
-                if (calendarLang === 'ne') {
-                    displayTime = toDevanagari(timeStr);
-                    bsStr = bsStr ? toDevanagari(bsStr) : '--';
-                    bsHtml = `<span style="color: #1e88e5; font-weight:bold;">${bsStr}</span>`;
-                    timeHtml = `<span style="color: #1e88e5; font-weight:bold;">${displayTime}</span>`;
-                } else {
-                    bsHtml = `<span style="color: #1e88e5">${bsStr}</span>`;
-                    timeHtml = `<span style="color: #1e88e5">${displayTime}</span>`;
-                }
-            }
-            todayDiv.innerHTML = `Current date and time (NPL): <br>${bsHtml}&nbsp;&nbsp;&nbsp;&nbsp;${timeHtml}`;
+
+            const nplNow = getNplNow();
+            const adStr = getClockAdStr(nplNow);
+            const dateHtml = computeToolbarDateHtml(adStr);
+            const timeHtml = formatClockTime(nplNow);
+
+            todayDiv.innerHTML = `Current date and time (NPL): <br>` +
+                `<span style="color:#1e88e5; font-weight:bold;">${dateHtml}</span>` +
+                `&nbsp;&nbsp;&nbsp;&nbsp;` +
+                `<span style="color:#1e88e5; font-weight:bold;">${timeHtml}</span>`;
         }
         
-        // Update immediately and then every 30 seconds
+        // Update immediately and then every second to stay in sync with the toolbar clock
         updateTodayNPL();
-        setInterval(updateTodayNPL, TIMING.TODAY_UPDATE);
+        setInterval(updateTodayNPL, 1000);
         
         // Update display when language changes
         tabContent.addEventListener('change', (e) => {
@@ -766,6 +812,202 @@
         }, TIMING.FALLBACK_CHECK);
 
         log('Observer started on edit-panel');
+
+        // Start the toolbar date/time clock
+        initToolbarClock();
+    };
+
+    // =================================================================
+    // TOOLBAR DATE & TIME CLOCK
+    // =================================================================
+
+    let toolbarClockElem = null;
+    let _clockLastAd = '';   // last AD date string the date portion was built for
+    let _clockDateHtml = '';
+
+    /**
+     * Returns a Date shifted to the Nepal time zone (UTC+05:45)
+     * @returns {Date} - Current Nepal date/time
+     */
+    const getNplNow = () => new Date(Date.now() + NEPAL_TIMEZONE_OFFSET_MINUTES * 60000);
+
+    /**
+     * Returns today's AD date string (YYYY-MM-DD) for a given Nepal Date.
+     * @param {Date} nplNow - Current Nepal date/time
+     * @returns {string} - AD date in YYYY-MM-DD format
+     */
+    const getClockAdStr = (nplNow) =>
+        `${nplNow.getUTCFullYear()}-${padZero(nplNow.getUTCMonth() + 1)}-${padZero(nplNow.getUTCDate())}`;
+
+    /**
+     * Formats the clock time (HH:MM:SS) in the selected numeral language.
+     * @param {Date} nplNow - Current Nepal date/time
+     * @returns {string} - Formatted time string
+     */
+    const formatClockTime = (nplNow) => {
+        const timeStr = `${padZero(nplNow.getUTCHours())}:${padZero(nplNow.getUTCMinutes())}:${padZero(nplNow.getUTCSeconds())}`;
+        return calendarLang === 'ne' ? toDevanagari(timeStr) : timeStr;
+    };
+
+    /**
+     * Builds the formatted BS date (HTML) for the toolbar clock.
+     * Only called when the AD date changes, so the AD_TO_BS conversion
+     * runs at most once per day regardless of the ticking seconds.
+     * @param {string} adStr - AD date in YYYY-MM-DD format
+     * @returns {string} - HTML for the date portion of the clock
+     */
+    const computeToolbarDateHtml = (adStr) => {
+        const fallback = calendarLang === 'ne' ? 'बि.सं. --' : 'BS --';
+        if (!isNepaliDateAvailable()) return fallback;
+
+        const bsStr = unsafeWindow.NepaliDate.AD_TO_BS(adStr);
+        if (!bsStr || bsStr.includes('Error') || bsStr.includes('Invalid')) return fallback;
+
+        const [bsYear, bsMonth, bsDay] = bsStr.split('-').map(Number);
+        let label;
+        if (calendarLang === 'ne') {
+            const monthName = CALENDAR_CONFIG.NEPALI_MONTHS[bsMonth - 1] || '';
+            label = `बि.सं. ${toDevanagari(bsYear)} ${monthName} ${toDevanagari(bsDay)}`;
+        } else {
+            const monthName = CALENDAR_CONFIG.ENGLISH_MONTHS[bsMonth - 1] || '';
+            label = `BS ${bsYear} ${monthName} ${bsDay}`;
+        }
+
+        // Append a holiday marker when today is a public holiday
+        try {
+            const holiday = getHolidayInfo(bsStr);
+            if (holiday) {
+                const tooltip = formatHolidayDisplay(holiday, 'en').trim();
+                label += `<span class="wme-ad-bs-clock-holiday" title="${tooltip}">${formatHolidayDisplay(holiday, calendarLang)}</span>`;
+            }
+        } catch (e) { /* ignore */ }
+
+        return label;
+    };
+
+    /**
+     * Refreshes the toolbar clock, forcing the BS date to be recomputed
+     * (used when the language preference changes).
+     */
+    const refreshToolbarClock = () => {
+        _clockLastAd = '';
+        _clockDateHtml = '';
+        updateToolbarClock();
+    };
+
+    /**
+     * Updates the visible content of the toolbar clock.
+     * The date portion is rebuilt only when the AD date changes; the time
+     * portion (cheap text update) refreshes every second.
+     */
+    const updateToolbarClock = () => {
+        if (!toolbarClockEnabled || !toolbarClockElem || !toolbarClockElem.isConnected) return;
+
+        const nplNow = getNplNow();
+        const adStr = getClockAdStr(nplNow);
+
+        // Rebuild the date portion only when the AD date (or language) changes
+        if (adStr !== _clockLastAd) {
+            _clockLastAd = adStr;
+            _clockDateHtml = computeToolbarDateHtml(adStr);
+            const dateSpan = toolbarClockElem.querySelector('.wme-ad-bs-clock-date');
+            if (dateSpan) dateSpan.innerHTML = _clockDateHtml;
+        }
+
+        const timeSpan = toolbarClockElem.querySelector('.wme-ad-bs-clock-time');
+        if (timeSpan) {
+            timeSpan.textContent = formatClockTime(nplNow);
+        }
+    };
+
+    /**
+     * Creates the clock DOM element.
+     * @returns {HTMLElement} - The clock element
+     */
+    const buildToolbarClock = () => {
+        const elem = document.createElement('div');
+        elem.className = 'wme-ad-bs-toolbar-clock';
+        elem.id = ELEMENT_IDS.TOOLBAR_CLOCK;
+        elem.title = 'Nepali date (Bikram Sambat) and Nepal Standard Time (UTC+05:45)';
+
+        const dateSpan = document.createElement('span');
+        dateSpan.className = 'wme-ad-bs-clock-date';
+        dateSpan.textContent = calendarLang === 'ne' ? 'बि.सं. --' : 'BS --';
+
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'wme-ad-bs-clock-time';
+        timeSpan.textContent = '--:--:--';
+
+        elem.appendChild(dateSpan);
+        elem.appendChild(timeSpan);
+        return elem;
+    };
+
+    /**
+     * Ensures the clock element exists in the secondary toolbar, positioned
+     * just before '.secondary-toolbar-actions'.
+     * @returns {HTMLElement|null} - The clock element, or null if toolbar is not ready
+     */
+    const ensureToolbarClock = () => {
+        const secondaryToolbar = document.querySelector('#toolbar .secondary-toolbar');
+        if (!secondaryToolbar) return null;
+
+        const actions = secondaryToolbar.querySelector(':scope > .secondary-toolbar-actions');
+        const elem = buildToolbarClock();
+        toolbarClockElem = elem;
+
+        // A freshly built element starts with a placeholder date, so force the
+        // BS date to be recomputed on the next update call.
+        _clockLastAd = '';
+        _clockDateHtml = '';
+
+        if (actions) {
+            secondaryToolbar.insertBefore(elem, actions);
+        } else {
+            secondaryToolbar.appendChild(elem);
+        }
+        return elem;
+    };
+
+    /**
+     * Enables or disables the toolbar clock and persists the preference.
+     * @param {boolean} enabled - Whether the clock should be shown
+     */
+    const setToolbarClockEnabled = (enabled) => {
+        toolbarClockEnabled = enabled;
+        GM_setValue(SETTINGS.TOOLBAR_CLOCK, enabled);
+
+        if (enabled) {
+            _clockLastAd = ''; // ensure the date is (re)computed for the inserted element
+            ensureToolbarClock();
+            updateToolbarClock();
+        } else if (toolbarClockElem) {
+            toolbarClockElem.remove();
+            toolbarClockElem = null;
+        }
+        log(`Toolbar date/time clock ${enabled ? 'enabled' : 'disabled'}`);
+    };
+
+    /**
+     * Initializes the toolbar clock. The toolbar is always present, so the
+     * clock only needs to be inserted once and then updated live. The clock
+     * is only shown while the 'Show date & time in toolbar' setting is on.
+     */
+    const initToolbarClock = () => {
+        if (toolbarClockEnabled) {
+            ensureToolbarClock();
+            updateToolbarClock();
+        }
+
+        // Keep the time fresh every second (no-op while disabled)
+        setInterval(() => {
+            if (toolbarClockEnabled && (!toolbarClockElem || !toolbarClockElem.isConnected)) {
+                ensureToolbarClock();
+            }
+            updateToolbarClock();
+        }, 1000);
+
+        log(`Toolbar date/time clock initialized (enabled=${toolbarClockEnabled})`);
     };
 
     // =================================================================
@@ -1515,6 +1757,12 @@
 })();
 
 /******** Version changelog  ********
+Version 0.2.6 - 2026-09-05:
+    - Added a live Nepali (BS) date & time clock to the secondary toolbar
+    - Added 'Show date & time in toolbar' checkbox in the script tab; preference is remembered
+    - Script tab 'Current date and time (NPL)' now matches the toolbar clock (seconds + month names) and updates every second
+    - Fixed toolbar date not showing when the clock is re-enabled
+    - Various minor bug fixes and improved stability
 Version 0.2.2 - 2026-03-05:
     - Added Nepali Public Holidays<br>
 Version 0.2.1 - 2026-02-09:
