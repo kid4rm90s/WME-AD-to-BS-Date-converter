@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WME AD to BS Converter
 // @namespace    https://greasyfork.org/users/1087400
-// @version      0.2.6
+// @version      0.2.7
 // @description  Converts AD dates to BS dates in WME closure panel
 // @author       https://greasyfork.org/en/users/1087400-kid4rm90s
 // @include 	   /^https:\/\/(www|beta)\.waze\.com\/(?!user\/)(.{2,6}\/)?editor.*$/
@@ -317,10 +317,9 @@
     const SCRIPT_PREFIX = 'WME_ADtoBS';
     const scriptName = GM_info.script.name;
     const scriptVersion = GM_info.script.version;
-    const updateMessage = `<strong>Version ${scriptVersion} - 2026-09-05:</strong><br>
-    - Added a live Nepali (BS) date &amp; time clock to the toolbar<br>
-    - Added 'Show date &amp; time in toolbar' option in the script tab (preference is remembered)<br>
-    - Script tab date/time now stays in sync with the toolbar clock<br>
+    const updateMessage = `<strong>Version ${scriptVersion} - 2026-09-26:</strong><br>
+    - Fixed BS date display not showing under native WME date pickers<br>
+    - Date picker detection now also uses WME's stable data-testid attributes<br>
     - Various bug fixes and improved stability`;
     const downloadUrl = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/code/WME-AD-to-BS-Converter.user.js';
     const forumURL = 'https://greasyfork.org/en/scripts/563916-wme-ad-to-bs-converter/feedback';
@@ -357,6 +356,12 @@
         TODAY_DISPLAY: 'wme-ad-bs-today',
         EDIT_PANEL: 'edit-panel',
         TOOLBAR_CLOCK: 'wme-ad-bs-toolbar-clock'
+    };
+
+    // Date picker selectors (data-testid survives WME's CSS class renames)
+    const SELECTORS = {
+        DATE_INPUT: '[data-testid="date-picker-input"], .date-picker-input, [class*="datePickerInput--"]',
+        DATE_PICKER: '[data-testid="date-time-picker"], .date-time-picker, [class*="dateTimePicker--"]'
     };
 
     // User settings keys (persisted in GM storage)
@@ -765,8 +770,8 @@
         const processDateInputs = (node) => {
             if (node.nodeType !== Node.ELEMENT_NODE) return;
             
-            // Native WME UI: all date-picker-inputs (by class)
-            node.querySelectorAll?.('.date-picker-input').forEach(inputElem => {
+            // Native WME UI: all date pickers
+            node.querySelectorAll?.(SELECTORS.DATE_INPUT).forEach(inputElem => {
                 if (inputElem instanceof HTMLElement) {
                     setupDateDisplay(inputElem);
                 }
@@ -803,8 +808,8 @@
                 setupDateDisplay(advEndInput);
             }
 
-            // Native WME UI: all date-picker-inputs (by class)
-            document.querySelectorAll('.date-picker-input').forEach(inputElem => {
+            // Native WME UI: all date pickers
+            document.querySelectorAll(SELECTORS.DATE_INPUT).forEach(inputElem => {
                 if (inputElem instanceof HTMLElement && !document.getElementById(`${inputElem.id}-bs-val`)) {
                     setupDateDisplay(inputElem);
                 }
@@ -1539,8 +1544,8 @@
             return;
         }
         
-        // Try to insert after .date-time-picker container
-        const dateTimePicker = inputElem.closest('.date-time-picker');
+        // Try to insert after the date/time picker container
+        const dateTimePicker = inputElem.closest(SELECTORS.DATE_PICKER);
         if (dateTimePicker?.parentNode) {
             dateTimePicker.parentNode.insertBefore(bsDisplay, dateTimePicker.nextSibling);
             return;
@@ -1757,6 +1762,9 @@
 })();
 
 /******** Version changelog  ********
+Version 0.2.7 - 2026-09-26:
+    - Fixed BS date display not showing under native WME date pickers
+    - Date picker detection now uses data-testid selectors (WME renamed the native CSS classes)
 Version 0.2.6 - 2026-09-05:
     - Added a live Nepali (BS) date & time clock to the secondary toolbar
     - Added 'Show date & time in toolbar' checkbox in the script tab; preference is remembered
